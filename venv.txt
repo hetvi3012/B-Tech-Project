@@ -1,0 +1,43 @@
+# 1. Delete old environment if it exists (Optional, for a clean slate)
+conda remove --name btp_env --all -y
+
+# 2. Create new environment with Python 3.10 and pip
+conda create -n btp_env python=3.10 pip -y
+
+# 3. Activate the environment (CRITICAL STEP)
+conda activate btp_env
+
+# 4. Upgrade internal pip to avoid build errors
+python -m pip install --upgrade pip
+
+# 1. Install vLLM (Inference Engine)
+python -m pip install vllm==0.6.3
+
+# 2. Downgrade Transformers to prevent compatibility errors (CRITICAL)
+python -m pip install transformers==4.46.3
+
+python -m pip install \
+    openai \
+    platformdirs \
+    rich \
+    click \
+    chromadb \
+    sentence-transformers \
+    langchain-text-splitters \
+    duckduckgo-search \
+    fastmcp \
+    prompt_toolkit
+
+python -m vllm.entrypoints.openai.api_server \
+    --model casperhansen/llama-3-8b-instruct-awq \
+    --quantization awq \
+    --gpu-memory-utilization 0.90 \
+    --max-model-len 2048 \
+    --port 8000 \
+    --rope-scaling '{"type": "linear", "factor": 1.0}'
+    
+python knowledge/ingest.py
+
+export API_KEY="ollama"  # Mock key required by client
+python main.py
+
