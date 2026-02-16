@@ -160,34 +160,28 @@ class Tool(abc.ABC):
             description=f"Execute {self.name}",
         )
 
-    def to_openai_schema(self) -> dict[str, Any]:
-        schema = self.schema
-
-        if isinstance(schema, type) and issubclass(schema, BaseModel):
-
-            json_schema = model_json_schema(schema, mode="serialization")
-
+    def to_openai_schema(self):
+            """
+            Converts the tool to the OpenAI function calling schema.
+            Handles both dict schemas and Pydantic model schemas.
+            """
+            # 1. Get the parameters schema
+            parameters = self.schema
+            
+            # 2. If it's a Pydantic model class (has a schema method), convert it to a dict
+            if hasattr(parameters, "model_json_schema"):
+                # Pydantic v2
+                parameters = parameters.model_json_schema()
+            elif hasattr(parameters, "schema") and callable(parameters.schema):
+                # Pydantic v1
+                parameters = parameters.schema()
+                
+            # 3. Wrap in the function structure vLLM expects
             return {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": json_schema.get("properties", {}),
-                    "required": json_schema.get("required", []),
-                },
+                "type": "function",
+                "function": {
+                    "name": self.name,
+                    "description": self.description,
+                    "parameters": parameters
+                }
             }
-
-        if isinstance(schema, dict):
-            result = {
-                "name": self.name,
-                "description": self.description,
-            }
-
-            if "parameters" in schema:
-                result["parameters"] = schema["parameters"]
-            else:
-                result["parameters"] = schema
-
-            return result
-
-        raise ValueError(f"Invalid schema type for tool {self.name}: {type(schema)}")
